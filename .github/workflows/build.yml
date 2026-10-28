@@ -18,17 +18,26 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'tools platform-tools platforms;android-34 build-tools;34.0.0'
-
-      - name: Accept licenses
+      - name: Setup Android SDK (manual)
         run: |
+          mkdir -p "$HOME/android-sdk/cmdline-tools"
+          cd /tmp
+          curl -sL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdtools.zip
+          unzip -q cmdtools.zip
+          mv cmdline-tools "$HOME/android-sdk/cmdline-tools/latest"
+          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
+
+      - name: Install SDK packages
+        run: |
+          yes | sdkmanager --sdk_root=$ANDROID_HOME \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" || true
           mkdir -p "$ANDROID_HOME/licenses"
           echo -e "24333f8a63b6825fea9c531c901af6ea" > "$ANDROID_HOME/licenses/android-sdk-license"
           echo -e "84831b9409646a918e30573bab4c9c91" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
-          yes | sdkmanager --licenses >/dev/null || true
 
       - name: Install Gradle
         run: |
