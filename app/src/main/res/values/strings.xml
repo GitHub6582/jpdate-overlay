@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">日本語日付</string>
+    <string name="notification_channel">日付オーバーレイ</string>
+    <string name="notification_title">日本語日付を表示中</string>
+    <string name="notification_text">タップで設定画面を開く</string>
+</resources>
