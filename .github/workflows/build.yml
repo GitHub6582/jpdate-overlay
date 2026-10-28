@@ -20,21 +20,26 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'tools platform-tools platforms;android-34 build-tools;34.0.0'
 
-      - name: Grant execute for gradlew (if present)
+      - name: Accept licenses
         run: |
-          if [ -f ./gradlew ]; then chmod +x ./gradlew; fi
+          mkdir -p "$ANDROID_HOME/licenses"
+          echo -e "24333f8a63b6825fea9c531c901af6ea" > "$ANDROID_HOME/licenses/android-sdk-license"
+          echo -e "84831b9409646a918e30573bab4c9c91" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          yes | sdkmanager --licenses >/dev/null || true
 
-      - name: Build debug APK (Gradle Wrapper)
-        if: hashFiles('gradlew') != ''
-        run: ./gradlew :app:assembleDebug --no-daemon
-
-      - name: Build debug APK (system Gradle)
-        if: hashFiles('gradlew') == ''
+      - name: Install Gradle
         run: |
           curl -sL https://services.gradle.org/distributions/gradle-8.6-bin.zip -o /tmp/gradle.zip
           sudo unzip -q /tmp/gradle.zip -d /opt
-          /opt/gradle-8.6/bin/gradle :app:assembleDebug --no-daemon
+          echo "/opt/gradle-8.6/bin" >> $GITHUB_PATH
+
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --no-daemon
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
