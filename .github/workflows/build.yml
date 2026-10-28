@@ -2,12 +2,11 @@ name: Build APK from ZIP
 
 on:
   push:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -16,47 +15,36 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: 17
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
 
-      - name: Check ZIP and extract the source to build
-        shell: bash
+      - name: Unzip project
         run: |
-          set -euo pipefail
-          test -f jpdate-overlay.zip || { echo 'jpdate-overlay.zip was not found in the repository root.'; exit 1; }
-          rm -rf .zip-build-source
-          mkdir -p .zip-build-source
-          unzip -q jpdate-overlay.zip -d .zip-build-source
-          PROJECT_DIR="$(find "$GITHUB_WORKSPACE/.zip-build-source" -type f -name settings.gradle.kts -print -quit | xargs -r dirname)"
-          if [ -z "$PROJECT_DIR" ] || [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ]; then
-            echo 'The ZIP does not contain a valid Android Gradle project (settings.gradle.kts and app/build.gradle.kts).'
-            find .zip-build-source -maxdepth 4 -type f | sort | head -100
-            exit 1
+          mkdir -p work
+          unzip -q jpdate-overlay.zip -d work
+
+      - name: Accept Android licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Build debug APK
+        run: |
+          SETTINGS=$(find work -name 'settings.gradle*' | head -n1)
+          PROJ=$(dirname "$SETTINGS")
+          echo "Project dir: $PROJ"
+          cd "$PROJ"
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          else
+            gradle assembleDebug --no-daemon --stacktrace
           fi
-          echo "Building project from ZIP: ${PROJECT_DIR#$GITHUB_WORKSPACE/}"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-      - name: Install system Gradle
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl -fsSL https://services.gradle.org/distributions/gradle-8.6-bin.zip -o /tmp/gradle.zip
-          sudo unzip -q /tmp/gradle.zip -d /opt
-          echo '/opt/gradle-8.6/bin' >> "$GITHUB_PATH"
-
-      - name: Build debug APK from ZIP source
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > "$PROJECT_DIR/local.properties"
-          cd "$PROJECT_DIR"
-          gradle :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: jpdate-overlay-debug-from-zip
-          path: .zip-build-source/**/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+          name: app-debug
+          path: work/**/*.apk
